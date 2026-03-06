@@ -28,8 +28,8 @@ const Index = () => {
           scaleMobile: 1.0,
           quantity: 4.0,
           backgroundColor: 0xffffff, // White background
-          color1: 0x3b82f6,           // Primary blue
-          color2: 0x1e3a8a,           // Darker blue for text matching
+          color1: 0xf97316,           // Orange (Tailwind orange-500)
+          color2: 0xea580c,           // Darker Orange (Tailwind orange-600)
           birdSize: 1.2,
           wingSpan: 20.0,
           speedLimit: 4.0,
