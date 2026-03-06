@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus } from "lucide-react";
+import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -49,6 +49,7 @@ const AdminDashboard = () => {
   const [scheduleInput, setScheduleInput] = useState("");
   const [newScheduleTime, setNewScheduleTime] = useState("");
   const [newScheduleTitle, setNewScheduleTitle] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const loadData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -115,10 +116,16 @@ const AdminDashboard = () => {
   };
 
   const joinLink = `${window.location.origin}/#/join/${event?.event_code}`;
-  const confirmed = participants.filter(p => p.attendance_confirmed);
-  const notConfirmed = participants.filter(p => !p.attendance_confirmed);
-  const overnightStay = participants.filter(p => p.overnight_stay === true);
-  const nonOvernight = participants.filter(p => p.overnight_stay === false);
+
+  const filteredParticipants = participants.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const confirmed = filteredParticipants.filter(p => p.attendance_confirmed);
+  const notConfirmed = filteredParticipants.filter(p => !p.attendance_confirmed);
+  const overnightStay = filteredParticipants.filter(p => p.overnight_stay === true);
+  const nonOvernight = confirmed.filter(p => p.overnight_stay !== true);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -267,6 +274,16 @@ const AdminDashboard = () => {
               <span className="text-muted-foreground">pending</span>
             </div>
           </div>
+        </div>
+
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search participants by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-11 bg-card border-border/50 focus:border-primary/50 transition-colors"
+          />
         </div>
 
         <Tabs defaultValue="participants" className="w-full">
