@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# EventPresence | Effortless Check-ins
 
-## Project info
+**EventPresence** is a streamlined event management and presence tracking system designed for speed, reliability, and ease of use. This platform allows organizers to manage participants in real-time and provides a frictionless check-in experience for attendees.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+> Made with ❤️ by **DevX**
 
-## How can I edit this code?
+## 🚀 Key Features
 
-There are several ways of editing your application.
+- **Instant Check-ins**: Participants can confirm their presence using a unique event code.
+- **Admin Dashboard**: A comprehensive suite for event managers to:
+  - Import/Export participant lists (CSV/Excel support).
+  - Manage event schedules in real-time.
+  - Track "Overnight Stay" registrations.
+  - Search and filter participant lists by name or email.
+  - Manage multiple administrators via invite links.
+- **Mobile-First Design**: Fully responsive UI/UX optimized for organizers on the go.
+- **Real-time Sync**: Powered by Supabase for instantaneous updates across all connected devices.
+- **SPA Reliability**: Implements hash-based routing to ensure persistent sessions even after page refreshes.
 
-**Use Lovable**
+## 🛠️ Tech Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- **Frontend**: React 18, Vite, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui (Radix UI)
+- **Backend/Database**: Supabase (PostgreSQL, Auth, Real-time)
+- **State Management**: React Query (TanStack Query)
+- **Routing**: React Router DOM (HashRouter)
+- **Animations**: Framer Motion
 
-Changes made via Lovable will be committed automatically to this repo.
+## ⚙️ Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Node.js (v18 or later)
+- npm or yarn
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Installation
 
-Follow these steps:
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd event-flow-main
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. Set up environment variables:
+   Create a `.env` file in the root directory and add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## 📂 Project Structure
 
-**Edit a file directly in GitHub**
+- `/src/pages`: Application views (Index, Dashboard, AdminDashboard, etc.)
+- `/src/components`: Reusable UI components powered by shadcn/ui.
+- `/src/integrations`: Supabase client configuration and hooks.
+- `/supabase`: Database migrations and schema definitions.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+© 2026 DevX. All rights reserved.
