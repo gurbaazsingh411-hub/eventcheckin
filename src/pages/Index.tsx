@@ -27,12 +27,12 @@ const Index = () => {
           scale: 1.0,
           scaleMobile: 1.0,
           quantity: 4.0,
-          backgroundColor: 0x010816, // Matches background-dark
-          color1: 0x3b82f6,
-          color2: 0x60a5fa,
-          birdSize: 1.5,
+          backgroundColor: 0xffffff, // White background
+          color1: 0x3b82f6,           // Primary blue
+          color2: 0x1e3a8a,           // Darker blue for text matching
+          birdSize: 1.2,
           wingSpan: 20.0,
-          speedLimit: 5.0,
+          speedLimit: 4.0,
           separation: 50.0,
           alignment: 50.0,
           cohesion: 50.0,
@@ -45,7 +45,7 @@ const Index = () => {
   }, [vantaEffect]);
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#010816]">
+    <div className="relative min-h-screen w-full overflow-hidden bg-white">
       {/* Vanta Background Container */}
       <div
         ref={vantaRef}
