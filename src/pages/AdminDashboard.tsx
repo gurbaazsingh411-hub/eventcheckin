@@ -1,0 +1,442 @@
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus } from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import * as XLSX from "xlsx";
+
+interface Event {
+  id: string;
+  event_name: string;
+  event_date: string;
+  event_code: string;
+  is_overnight: boolean;
+  schedule: Array<{ time: string; title: string }>;
+}
+
+interface Participant {
+  id: string;
+  name: string;
+  email: string;
+  attendance_confirmed: boolean;
+  confirmed_at: string | null;
+  overnight_stay: boolean | null;
+}
+
+interface Admin {
+  id: string;
+  user_id: string;
+  role: string;
+  created_at: string;
+  profiles?: {
+    name: string | null;
+    email: string | null;
+  } | null;
+}
+
+const AdminDashboard = () => {
+  const { eventId } = useParams();
+  const navigate = useNavigate();
+  const [event, setEvent] = useState<Event | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [scheduleInput, setScheduleInput] = useState("");
+  const [newScheduleTime, setNewScheduleTime] = useState("");
+  const [newScheduleTitle, setNewScheduleTitle] = useState("");
+
+  const loadData = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { navigate("/auth"); return; }
+
+    const { data: admin } = await supabase
+      .from("event_admins")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+
+    if (!admin) { toast.error("Access denied"); navigate("/dashboard"); return; }
+
+    const { data: eventData } = await supabase.from("events").select("*").eq("id", eventId).single();
+    if (eventData) setEvent(eventData as unknown as Event);
+
+    const { data: parts } = await supabase.from("participants").select("*").eq("event_id", eventId).order("name");
+    setParticipants((parts as Participant[]) || []);
+
+    const { data: adminList } = await supabase
+      .from("event_admins")
+      .select("*, profiles:user_id(name, email)")
+      .eq("event_id", eventId)
+      .order("created_at");
+    setAdmins((adminList as unknown as Admin[]) || []);
+
+    setLoading(false);
+  }, [eventId, navigate]);
+
+  useEffect(() => {
+    loadData();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel(`participants-${eventId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "participants", filter: `event_id=eq.${eventId}` }, () => {
+        loadData();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [eventId, loadData]);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied!`);
+  };
+
+  const joinLink = `${window.location.origin}/join/${event?.event_code}`;
+  const confirmed = participants.filter(p => p.attendance_confirmed);
+  const notConfirmed = participants.filter(p => !p.attendance_confirmed);
+  const overnightStay = participants.filter(p => p.overnight_stay === true);
+  const nonOvernight = participants.filter(p => p.overnight_stay === false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      const newParticipants = rows
+        .filter(r => r.Name && r.Email)
+        .map(r => ({
+          event_id: eventId!,
+          name: String(r.Name).trim(),
+          email: String(r.Email).trim().toLowerCase(),
+        }));
+
+      if (!newParticipants.length) {
+        toast.error("No valid rows found. Ensure columns are 'Name' and 'Email'.");
+        return;
+      }
+
+      const { error } = await supabase.from("participants").upsert(newParticipants, { onConflict: "event_id,email" });
+      if (error) throw error;
+      toast.success(`${newParticipants.length} participants uploaded!`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+    e.target.value = "";
+  };
+
+  const removeParticipant = async (id: string) => {
+    await supabase.from("participants").delete().eq("id", id);
+    loadData();
+  };
+
+  const toggleOvernight = async (id: string, current: boolean | null) => {
+    await supabase.from("participants").update({ overnight_stay: !current }).eq("id", id);
+    loadData();
+  };
+
+  const addScheduleItem = async () => {
+    if (!newScheduleTime || !newScheduleTitle || !event) return;
+    const updated = [...(event.schedule || []), { time: newScheduleTime, title: newScheduleTitle }];
+    await supabase.from("events").update({ schedule: updated as any }).eq("id", event.id);
+    setEvent({ ...event, schedule: updated });
+    setNewScheduleTime("");
+    setNewScheduleTitle("");
+    toast.success("Schedule item added!");
+  };
+
+  const removeScheduleItem = async (index: number) => {
+    if (!event) return;
+    const updated = event.schedule.filter((_, i) => i !== index);
+    await supabase.from("events").update({ schedule: updated as any }).eq("id", event.id);
+    setEvent({ ...event, schedule: updated });
+  };
+
+  const removeAdmin = async (id: string) => {
+    if (admins.length <= 1) {
+      toast.error("Cannot remove the last administrator");
+      return;
+    }
+    const { error } = await supabase.from("event_admins").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Administrator removed");
+    loadData();
+  };
+
+  const createAdminInvite = async () => {
+    if (!event) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data, error } = await supabase.from("admin_invites").insert({
+      event_id: event.id,
+      created_by: session.user.id,
+    }).select().single();
+    if (error) { toast.error(error.message); return; }
+    const link = `${window.location.origin}/admin-invite/${(data as any).invite_code}`;
+    copyToClipboard(link, "Admin invite link");
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">Loading...</div>;
+  if (!event) return null;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <nav className="border-b border-border bg-card">
+        <div className="container mx-auto flex items-center justify-between h-16 px-4">
+          <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm">
+            <ArrowLeft className="w-4 h-4" /> Back
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded gradient-primary flex items-center justify-center">
+              <CalendarCheck className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold">{event.event_name}</span>
+          </div>
+          <div className="text-sm text-muted-foreground">{format(new Date(event.event_date), "MMM d, yyyy")}</div>
+        </div>
+      </nav>
+
+      <div className="container mx-auto px-4 py-6 max-w-5xl">
+        {/* Quick Info Bar */}
+        <div className="glass-card rounded-xl p-4 mb-6 flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div>
+              <span className="text-xs text-muted-foreground block">Event Code</span>
+              <button onClick={() => copyToClipboard(event.event_code, "Event code")} className="font-mono text-lg font-bold text-primary hover:underline flex items-center gap-1">
+                {event.event_code} <Copy className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <span className="text-xs text-muted-foreground block">Join Link</span>
+              <button onClick={() => copyToClipboard(joinLink, "Join link")} className="text-sm text-primary hover:underline flex items-center gap-1">
+                <LinkIcon className="w-3 h-3" /> Copy Link
+              </button>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <span className="text-xs text-muted-foreground block">Invite Admin</span>
+              <button onClick={createAdminInvite} className="text-sm text-primary hover:underline flex items-center gap-1">
+                <Users className="w-3 h-3" /> Generate Link
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1.5">
+              <UserCheck className="w-4 h-4 text-success" />
+              <span className="font-semibold">{confirmed.length}</span>
+              <span className="text-muted-foreground">confirmed</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <UserX className="w-4 h-4 text-destructive" />
+              <span className="font-semibold">{notConfirmed.length}</span>
+              <span className="text-muted-foreground">pending</span>
+            </div>
+          </div>
+        </div>
+
+        <Tabs defaultValue="participants">
+          <TabsList className="mb-4">
+            <TabsTrigger value="participants"><Users className="w-4 h-4 mr-1" /> Participants</TabsTrigger>
+            <TabsTrigger value="schedule"><Clock className="w-4 h-4 mr-1" /> Schedule</TabsTrigger>
+            <TabsTrigger value="admins"><UserCheck className="w-4 h-4 mr-1" /> Admins</TabsTrigger>
+            {event.is_overnight && <TabsTrigger value="overnight"><Moon className="w-4 h-4 mr-1" /> Overnight</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="participants">
+            <div className="mb-4">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <Button variant="outline" size="sm" asChild>
+                  <span><Upload className="w-4 h-4 mr-1" /> Upload CSV/XLSX</span>
+                </Button>
+                <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+              </label>
+            </div>
+
+            {/* Confirmed */}
+            <div className="mb-6">
+              <h3 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-success" /> Confirmed ({confirmed.length})
+              </h3>
+              {confirmed.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No confirmations yet.</p>
+              ) : (
+                <div className="glass-card rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-border bg-secondary/30">
+                      <th className="text-left p-3 font-medium">Name</th>
+                      <th className="text-left p-3 font-medium">Email</th>
+                      <th className="text-left p-3 font-medium">Confirmed At</th>
+                      <th className="p-3"></th>
+                    </tr></thead>
+                    <tbody>
+                      {confirmed.map(p => (
+                        <tr key={p.id} className="border-b border-border/50">
+                          <td className="p-3">{p.name}</td>
+                          <td className="p-3 text-muted-foreground">{p.email}</td>
+                          <td className="p-3 text-muted-foreground">{p.confirmed_at ? format(new Date(p.confirmed_at), "MMM d, h:mm a") : "-"}</td>
+                          <td className="p-3"><Button variant="ghost" size="sm" onClick={() => removeParticipant(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Not Confirmed */}
+            <div>
+              <h3 className="font-semibold text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                <UserX className="w-4 h-4 text-destructive" /> Not Confirmed ({notConfirmed.length})
+              </h3>
+              {notConfirmed.length === 0 ? (
+                <p className="text-sm text-muted-foreground">All participants confirmed or no participants uploaded.</p>
+              ) : (
+                <div className="glass-card rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-border bg-secondary/30">
+                      <th className="text-left p-3 font-medium">Name</th>
+                      <th className="text-left p-3 font-medium">Email</th>
+                      <th className="p-3"></th>
+                    </tr></thead>
+                    <tbody>
+                      {notConfirmed.map(p => (
+                        <tr key={p.id} className="border-b border-border/50">
+                          <td className="p-3">{p.name}</td>
+                          <td className="p-3 text-muted-foreground">{p.email}</td>
+                          <td className="p-3"><Button variant="ghost" size="sm" onClick={() => removeParticipant(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="font-semibold mb-4">Event Schedule</h3>
+              <div className="space-y-2 mb-6">
+                {(event.schedule || []).map((item, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                    <div className="flex gap-3">
+                      <span className="font-mono text-primary font-medium">{item.time}</span>
+                      <span>{item.title}</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => removeScheduleItem(i)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                  </div>
+                ))}
+                {(!event.schedule || event.schedule.length === 0) && <p className="text-muted-foreground text-sm">No schedule items yet.</p>}
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="09:00 AM" value={newScheduleTime} onChange={e => setNewScheduleTime(e.target.value)} className="w-32" />
+                <Input placeholder="Registration" value={newScheduleTitle} onChange={e => setNewScheduleTitle(e.target.value)} className="flex-1" />
+                <Button onClick={addScheduleItem} className="gradient-primary text-primary-foreground"><Plus className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="admins">
+            <div className="glass-card rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/30">
+                    <th className="text-left p-3 font-medium">Name</th>
+                    <th className="text-left p-3 font-medium">Email</th>
+                    <th className="text-left p-3 font-medium">Role</th>
+                    <th className="text-left p-3 font-medium">Joined At</th>
+                    <th className="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {admins.map(admin => (
+                    <tr key={admin.id} className="border-b border-border/50">
+                      <td className="p-3 font-medium">
+                        {admin.profiles?.name || <span className="text-muted-foreground font-mono text-xs">{admin.user_id}</span>}
+                      </td>
+                      <td className="p-3 text-muted-foreground text-xs">
+                        {admin.profiles?.email || "-"}
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs capitalize">
+                          {admin.role}
+                        </span>
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {format(new Date(admin.created_at), "MMM d, yyyy")}
+                      </td>
+                      <td className="p-3 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAdmin(admin.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4 px-1">
+              Note: You can add more administrators by generating an invite link in the quick info bar above.
+            </p>
+          </TabsContent>
+
+          {event.is_overnight && (
+            <TabsContent value="overnight">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="glass-card rounded-xl p-5">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2"><Moon className="w-4 h-4" /> Staying Overnight ({overnightStay.length})</h3>
+                  {overnightStay.length === 0 ? <p className="text-sm text-muted-foreground">No one assigned yet.</p> : (
+                    <div className="space-y-2">
+                      {overnightStay.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-2 rounded bg-secondary/50 text-sm">
+                          <span>{p.name}</span>
+                          <Button variant="ghost" size="sm" onClick={() => toggleOvernight(p.id, true)}>Move out</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="glass-card rounded-xl p-5">
+                  <h3 className="font-semibold mb-3">Not Staying ({nonOvernight.length})</h3>
+                  {confirmed.filter(p => p.overnight_stay !== true).length === 0 ? <p className="text-sm text-muted-foreground">No participants to show.</p> : (
+                    <div className="space-y-2">
+                      {confirmed.filter(p => p.overnight_stay !== true).map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-2 rounded bg-secondary/50 text-sm">
+                          <span>{p.name}</span>
+                          <Button variant="ghost" size="sm" onClick={() => toggleOvernight(p.id, p.overnight_stay)}>Add to overnight</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDashboard;
