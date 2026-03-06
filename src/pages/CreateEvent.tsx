@@ -73,7 +73,10 @@ const CreateEvent = () => {
           <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
             <CalendarCheck className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold">Create Event</span>
+          <div className="flex flex-col text-left">
+            <span className="text-xl font-bold leading-none">Create Event</span>
+            <span className="text-[10px] font-bold text-primary uppercase tracking-wider mt-1">Powered by DevX</span>
+          </div>
         </div>
         <div className="glass-card rounded-xl p-6">
           <form onSubmit={handleCreate} className="space-y-5">

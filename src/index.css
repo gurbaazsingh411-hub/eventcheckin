@@ -78,6 +78,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground font-sans;
   }
@@ -87,13 +88,46 @@
   .gradient-primary {
     background: linear-gradient(135deg, hsl(12, 80%, 55%), hsl(36, 90%, 55%));
   }
+
   .gradient-text {
     background: linear-gradient(135deg, hsl(12, 80%, 55%), hsl(36, 90%, 55%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
   .glass-card {
     @apply bg-card/80 backdrop-blur-md border border-border/50 shadow-lg;
+  }
+
+  /* Animated Mesh Background */
+  .animate-mesh {
+    background-color: #ffffff;
+    background-image:
+      radial-gradient(at 0% 0%, hsla(25, 100%, 88%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(30, 100%, 85%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(35, 100%, 88%, 1) 0, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(20, 100%, 85%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 50%, hsla(25, 100%, 82%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 50%, hsla(30, 100%, 85%, 1) 0, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(35, 100%, 82%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 100%, hsla(25, 100%, 88%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(20, 100%, 85%, 1) 0, transparent 50%);
+    background-size: 200% 200%;
+    animation: mesh-move 20s ease-in-out infinite alternate;
+  }
+
+  @keyframes mesh-move {
+    0% {
+      background-position: 0% 0%;
+    }
+
+    50% {
+      background-position: 100% 100%;
+    }
+
+    100% {
+      background-position: 0% 0%;
+    }
   }
 }

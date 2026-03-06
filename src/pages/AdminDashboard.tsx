@@ -242,13 +242,10 @@ const AdminDashboard = () => {
             <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back</span>
           </Link>
           <div className="flex items-center gap-2 truncate px-2">
-            <img src="/devx-logo.png" alt="" className="w-full h-full object-contain" onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              const fallback = document.getElementById('fallback-logo');
-              if (fallback) fallback.classList.remove('hidden');
-            }} />
-            <CalendarCheck className="w-5 h-5 text-primary hidden" id="fallback-logo" />
-            <span className="font-bold truncate">{event.event_name}</span>
+            <div className="flex flex-col items-center">
+              <span className="font-bold truncate">{event.event_name}</span>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none">by DevX</span>
+            </div>
           </div>
           <div className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(event.event_date), "MMM d")}</div>
         </div>
@@ -488,6 +485,16 @@ const AdminDashboard = () => {
           )}
         </Tabs>
       </div>
+
+      <footer className="mt-auto py-8 border-t border-border bg-card">
+        <div className="container mx-auto px-4 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => window.open('https://devxgtbit.netlify.app', '_blank')}>
+            <img src="/devx-logo.png" alt="" className="w-5 h-5 object-contain" onError={e => e.currentTarget.style.display = 'none'} />
+            <span className="text-xs font-bold uppercase tracking-widest text-foreground">Made with ❤️ by <span className="text-primary italic">DevX</span></span>
+          </div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">EventPresence • Professional Event Management</p>
+        </div>
+      </footer>
     </div>
   );
 };

@@ -62,8 +62,8 @@ const Index = () => {
                 <CalendarCheck className="w-5 h-5 text-primary" id="fallback-logo" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-bold leading-none">EventPresence</span>
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">by DevX</span>
+                <span className="text-xl font-bold leading-none tracking-tight">EventPresence</span>
+                <span className="text-[11px] font-bold text-primary uppercase tracking-[0.2em] mt-0.5">by DevX</span>
               </div>
             </Link>
             <div className="flex items-center gap-3">
@@ -82,9 +82,12 @@ const Index = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-8">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse-dot" />
-                Real-time attendance tracking
+                Real-time attendance tracking • Powered by DevX
+              </div>
+              <div className="text-[12px] font-bold text-primary/60 uppercase tracking-[0.3em] mb-4">
+                A DevX Product
               </div>
               <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
                 Event check-in,
@@ -151,9 +154,9 @@ const Index = () => {
         {/* Footer */}
         <footer className="border-t border-border py-12 px-4 bg-secondary/5 backdrop-blur-sm">
           <div className="container mx-auto flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2">
-              <img src="/devx-logo.png" alt="DevX Logo" className="w-6 h-6 object-contain opacity-50" onError={(e) => e.currentTarget.style.display = 'none'} />
-              <span className="text-sm font-semibold text-muted-foreground">Made with ❤️ by DevX</span>
+            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.open('https://devxgtbit.netlify.app', '_blank')}>
+              <img src="/devx-logo.png" alt="DevX Logo" className="w-6 h-6 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+              <span className="text-sm font-bold text-foreground">Made with ❤️ by <span className="text-primary italic">DevX</span></span>
             </div>
             <p className="text-center text-muted-foreground text-xs">
               EventPresence — Fast attendance tracking for modern events.
