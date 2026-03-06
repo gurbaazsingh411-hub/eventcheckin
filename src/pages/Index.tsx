@@ -28,8 +28,8 @@ const Index = () => {
           scaleMobile: 1.0,
           quantity: 4.0,
           backgroundColor: 0xffffff, // White background
-          color1: 0xf97316,           // Orange (Tailwind orange-500)
-          color2: 0xea580c,           // Darker Orange (Tailwind orange-600)
+          color1: 0xc2410c,           // Darker Orange (Tailwind orange-700)
+          color2: 0x9a3412,           // Even Darker Orange (Tailwind orange-800)
           birdSize: 1.2,
           wingSpan: 20.0,
           speedLimit: 4.0,
@@ -49,7 +49,7 @@ const Index = () => {
       {/* Vanta Background Container */}
       <div
         ref={vantaRef}
-        className="fixed inset-0 z-0 pointer-events-none opacity-40"
+        className="fixed inset-0 z-0 pointer-events-none opacity-70"
       />
 
       <div className="relative z-10">
