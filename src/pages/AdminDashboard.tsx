@@ -172,19 +172,36 @@ const AdminDashboard = () => {
 
   const addScheduleItem = async () => {
     if (!newScheduleTime || !newScheduleTitle || !event) return;
-    const updated = [...(event.schedule || []), { time: newScheduleTime, title: newScheduleTitle }];
-    await supabase.from("events").update({ schedule: updated as any }).eq("id", event.id);
-    setEvent({ ...event, schedule: updated });
-    setNewScheduleTime("");
-    setNewScheduleTitle("");
-    toast.success("Schedule item added!");
+    try {
+      const updated = [...(event.schedule || []), { time: newScheduleTime, title: newScheduleTitle }];
+      const { error } = await supabase.from("events").update({ schedule: updated as any }).eq("id", event.id);
+
+      if (error) throw error;
+
+      setEvent({ ...event, schedule: updated });
+      setNewScheduleTime("");
+      setNewScheduleTitle("");
+      toast.success("Schedule item added!");
+    } catch (err: any) {
+      console.error("Error adding schedule item:", err);
+      toast.error(err.message || "Failed to add schedule item");
+    }
   };
 
   const removeScheduleItem = async (index: number) => {
     if (!event) return;
-    const updated = event.schedule.filter((_, i) => i !== index);
-    await supabase.from("events").update({ schedule: updated as any }).eq("id", event.id);
-    setEvent({ ...event, schedule: updated });
+    try {
+      const updated = event.schedule.filter((_, i) => i !== index);
+      const { error } = await supabase.from("events").update({ schedule: updated as any }).eq("id", event.id);
+
+      if (error) throw error;
+
+      setEvent({ ...event, schedule: updated });
+      toast.success("Schedule item removed");
+    } catch (err: any) {
+      console.error("Error removing schedule item:", err);
+      toast.error(err.message || "Failed to remove schedule item");
+    }
   };
 
   const removeAdmin = async (id: string) => {
