@@ -24,6 +24,11 @@ const JoinEvent = () => {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [eventName, setEventName] = useState("");
 
+  // Sync state with URL parameter
+  useState(() => {
+    if (urlCode && !eventCode) setEventCode(urlCode);
+  });
+
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -34,9 +39,13 @@ const JoinEvent = () => {
         _name: name.trim(),
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("RPC Error:", error);
+        throw error;
+      }
       const result = data as any;
       if (!result.success) {
+        console.warn("Confirmation failed:", result.error);
         toast.error(result.error);
         return;
       }

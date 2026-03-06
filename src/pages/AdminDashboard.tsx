@@ -69,12 +69,28 @@ const AdminDashboard = () => {
     const { data: parts } = await supabase.from("participants").select("*").eq("event_id", eventId).order("name");
     setParticipants((parts as Participant[]) || []);
 
-    const { data: adminList } = await supabase
-      .from("event_admins")
-      .select("*, profiles:user_id(name, email)")
-      .eq("event_id", eventId)
-      .order("created_at");
-    setAdmins((adminList as unknown as Admin[]) || []);
+    try {
+      const { data: adminList, error: adminError } = await supabase
+        .from("event_admins")
+        .select("*, profiles:user_id(name, email)")
+        .eq("event_id", eventId)
+        .order("created_at");
+
+      if (adminError) {
+        console.error("Error fetching admins:", adminError);
+        // Fallback to fetching without join if it fails
+        const { data: simpleAdmins } = await supabase
+          .from("event_admins")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("created_at");
+        setAdmins((simpleAdmins as unknown as Admin[]) || []);
+      } else {
+        setAdmins((adminList as unknown as Admin[]) || []);
+      }
+    } catch (err) {
+      console.error("Failed to load admins:", err);
+    }
 
     setLoading(false);
   }, [eventId, navigate]);
@@ -202,9 +218,12 @@ const AdminDashboard = () => {
             <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back</span>
           </Link>
           <div className="flex items-center gap-2 truncate px-2">
-            <div className="w-6 h-6 rounded gradient-primary flex-shrink-0 flex items-center justify-center">
-              <CalendarCheck className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src="/devx-logo.png" alt="" className="w-full h-full object-contain" onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const fallback = document.getElementById('fallback-logo');
+              if (fallback) fallback.classList.remove('hidden');
+            }} />
+            <CalendarCheck className="w-5 h-5 text-primary hidden" id="fallback-logo" />
             <span className="font-bold truncate">{event.event_name}</span>
           </div>
           <div className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(event.event_date), "MMM d")}</div>
