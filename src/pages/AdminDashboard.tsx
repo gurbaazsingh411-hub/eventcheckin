@@ -404,10 +404,10 @@ const AdminDashboard = () => {
                   {admins.map(admin => (
                     <tr key={admin.id} className="border-b border-border/50">
                       <td className="p-3 font-medium">
-                        {admin.profiles?.name || <span className="text-muted-foreground font-mono text-xs">{admin.user_id}</span>}
+                        {admin.profiles?.name || admin.profiles?.email || <span className="text-muted-foreground font-mono text-[10px]">{admin.user_id}</span>}
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">
-                        {admin.profiles?.email || "-"}
+                        {admin.profiles?.name ? admin.profiles.email : "-"}
                       </td>
                       <td className="p-3">
                         <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs capitalize">
