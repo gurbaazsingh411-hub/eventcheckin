@@ -39,12 +39,12 @@ const Index = () => {
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse-dot" />
               Real-time attendance tracking
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
+            <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
               Event check-in,
               <br />
               <span className="gradient-text">made effortless</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+            <p className="text-base md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
               Create events, upload participant lists, and track attendance in real-time.
               No participant accounts needed — just a code and a click.
             </p>
@@ -56,14 +56,14 @@ const Index = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <Link to="/create">
-              <Button size="lg" className="gradient-primary text-primary-foreground px-8 text-base h-12 shadow-lg hover:shadow-xl transition-shadow">
+            <Link to="/create" className="w-full sm:w-auto">
+              <Button size="lg" className="w-full sm:w-auto gradient-primary text-primary-foreground px-8 text-base h-12 shadow-lg hover:shadow-xl transition-shadow">
                 Create Event
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
-            <Link to="/join">
-              <Button size="lg" variant="outline" className="px-8 text-base h-12">
+            <Link to="/join" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 text-base h-12">
                 Join Event
               </Button>
             </Link>

@@ -59,18 +59,18 @@ const Dashboard = () => {
       <nav className="border-b border-border bg-card">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg gradient-primary flex-shrink-0 flex items-center justify-center">
               <CalendarCheck className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold">EventPresence</span>
+            <span className="text-xl font-bold truncate">EventPresence</span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link to="/create">
               <Button size="sm" className="gradient-primary text-primary-foreground">
-                <Plus className="w-4 h-4 mr-1" /> New Event
+                <Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">New Event</span><span className="sm:hidden">New</span>
               </Button>
             </Link>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="px-2">
               <LogOut className="w-4 h-4" />
             </Button>
           </div>
@@ -98,12 +98,12 @@ const Dashboard = () => {
                 to={`/admin/${event.id}`}
                 className="glass-card rounded-xl p-5 flex items-center justify-between hover:shadow-xl transition-shadow group"
               >
-                <div>
-                  <h3 className="font-semibold text-lg">{event.event_name}</h3>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                    <span>{format(new Date(event.event_date), "MMM d, yyyy")}</span>
-                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-mono text-xs">{event.event_code}</span>
-                    {event.is_overnight && <span className="px-2 py-0.5 rounded bg-accent/10 text-accent text-xs">Overnight</span>}
+                <div className="flex-1 min-w-0 pr-4">
+                  <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">{event.event_name}</h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                    <span className="whitespace-nowrap">{format(new Date(event.event_date), "MMM d, yyyy")}</span>
+                    <span className="px-2 py-0.5 rounded bg-primary/10 text-primary font-mono">{event.event_code}</span>
+                    {event.is_overnight && <span className="px-2 py-0.5 rounded bg-accent/10 text-accent font-medium">Overnight</span>}
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />

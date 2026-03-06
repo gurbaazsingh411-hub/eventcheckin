@@ -199,40 +199,40 @@ const AdminDashboard = () => {
       <nav className="border-b border-border bg-card">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <Link to="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm">
-            <ArrowLeft className="w-4 h-4" /> Back
+            <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded gradient-primary flex items-center justify-center">
+          <div className="flex items-center gap-2 truncate px-2">
+            <div className="w-6 h-6 rounded gradient-primary flex-shrink-0 flex items-center justify-center">
               <CalendarCheck className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-bold">{event.event_name}</span>
+            <span className="font-bold truncate">{event.event_name}</span>
           </div>
-          <div className="text-sm text-muted-foreground">{format(new Date(event.event_date), "MMM d, yyyy")}</div>
+          <div className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(event.event_date), "MMM d")}</div>
         </div>
       </nav>
 
       <div className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Quick Info Bar */}
-        <div className="glass-card rounded-xl p-4 mb-6 flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="glass-card rounded-xl p-4 mb-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <div>
-              <span className="text-xs text-muted-foreground block">Event Code</span>
-              <button onClick={() => copyToClipboard(event.event_code, "Event code")} className="font-mono text-lg font-bold text-primary hover:underline flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Event Code</span>
+              <button onClick={() => copyToClipboard(event.event_code, "Event code")} className="font-mono text-lg font-bold text-primary hover:underline flex items-center gap-1.5">
                 {event.event_code} <Copy className="w-3 h-3" />
               </button>
             </div>
-            <div className="h-8 w-px bg-border" />
+            <div className="hidden sm:block h-8 w-px bg-border" />
             <div>
-              <span className="text-xs text-muted-foreground block">Join Link</span>
-              <button onClick={() => copyToClipboard(joinLink, "Join link")} className="text-sm text-primary hover:underline flex items-center gap-1">
-                <LinkIcon className="w-3 h-3" /> Copy Link
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Join Link</span>
+              <button onClick={() => copyToClipboard(joinLink, "Join link")} className="text-sm font-medium text-primary hover:underline flex items-center gap-1.5">
+                <LinkIcon className="w-3.5 h-3.5" /> Copy Link
               </button>
             </div>
-            <div className="h-8 w-px bg-border" />
+            <div className="hidden sm:block h-8 w-px bg-border" />
             <div>
-              <span className="text-xs text-muted-foreground block">Invite Admin</span>
-              <button onClick={createAdminInvite} className="text-sm text-primary hover:underline flex items-center gap-1">
-                <Users className="w-3 h-3" /> Generate Link
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Invite Admin</span>
+              <button onClick={createAdminInvite} className="text-sm font-medium text-primary hover:underline flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> Generate Link
               </button>
             </div>
           </div>
@@ -250,12 +250,12 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="participants">
-          <TabsList className="mb-4">
-            <TabsTrigger value="participants"><Users className="w-4 h-4 mr-1" /> Participants</TabsTrigger>
-            <TabsTrigger value="schedule"><Clock className="w-4 h-4 mr-1" /> Schedule</TabsTrigger>
-            <TabsTrigger value="admins"><UserCheck className="w-4 h-4 mr-1" /> Admins</TabsTrigger>
-            {event.is_overnight && <TabsTrigger value="overnight"><Moon className="w-4 h-4 mr-1" /> Overnight</TabsTrigger>}
+        <Tabs defaultValue="participants" className="w-full">
+          <TabsList className="mb-4 w-full justify-start overflow-x-auto no-scrollbar flex-nowrap bg-transparent gap-2 h-auto p-0">
+            <TabsTrigger value="participants" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Users className="w-4 h-4 mr-2" /> Participants</TabsTrigger>
+            <TabsTrigger value="schedule" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Clock className="w-4 h-4 mr-2" /> Schedule</TabsTrigger>
+            <TabsTrigger value="admins" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><UserCheck className="w-4 h-4 mr-2" /> Admins</TabsTrigger>
+            {event.is_overnight && <TabsTrigger value="overnight" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Moon className="w-4 h-4 mr-2" /> Overnight</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="participants">
@@ -276,8 +276,8 @@ const AdminDashboard = () => {
               {confirmed.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No confirmations yet.</p>
               ) : (
-                <div className="glass-card rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
+                <div className="glass-card rounded-xl overflow-x-auto no-scrollbar">
+                  <table className="w-full text-sm min-w-full">
                     <thead><tr className="border-b border-border bg-secondary/30">
                       <th className="text-left p-3 font-medium">Name</th>
                       <th className="text-left p-3 font-medium">Email</th>
@@ -307,8 +307,8 @@ const AdminDashboard = () => {
               {notConfirmed.length === 0 ? (
                 <p className="text-sm text-muted-foreground">All participants confirmed or no participants uploaded.</p>
               ) : (
-                <div className="glass-card rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
+                <div className="glass-card rounded-xl overflow-x-auto no-scrollbar">
+                  <table className="w-full text-sm min-w-full">
                     <thead><tr className="border-b border-border bg-secondary/30">
                       <th className="text-left p-3 font-medium">Name</th>
                       <th className="text-left p-3 font-medium">Email</th>
@@ -353,8 +353,8 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="admins">
-            <div className="glass-card rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="glass-card rounded-xl overflow-x-auto no-scrollbar">
+              <table className="w-full text-sm min-w-full">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="text-left p-3 font-medium">Name</th>
