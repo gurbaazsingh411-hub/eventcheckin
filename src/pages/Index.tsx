@@ -10,10 +10,14 @@ const Index = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-border/50">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <CalendarCheck className="w-5 h-5 text-primary-foreground" />
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/devx-logo.png" alt="DevX Logo" className="w-full h-full object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+              <CalendarCheck className="w-5 h-5 text-primary" id="fallback-logo" />
             </div>
-            <span className="text-xl font-bold">EventPresence</span>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold leading-none">EventPresence</span>
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">by DevX</span>
+            </div>
           </Link>
           <div className="flex items-center gap-3">
             <Link to="/auth">
@@ -95,9 +99,15 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8 px-4">
-        <div className="container mx-auto text-center text-muted-foreground text-sm">
-          <p>EventPresence — Fast attendance confirmation for any event.</p>
+      <footer className="border-t border-border py-12 px-4 bg-secondary/5">
+        <div className="container mx-auto flex flex-col items-center gap-4">
+          <div className="flex items-center gap-2">
+            <img src="/devx-logo.png" alt="DevX Logo" className="w-6 h-6 object-contain opacity-50" onError={(e) => e.currentTarget.style.display = 'none'} />
+            <span className="text-sm font-semibold text-muted-foreground">Made with ❤️ by DevX</span>
+          </div>
+          <p className="text-center text-muted-foreground text-xs">
+            EventPresence — Fast attendance tracking for modern events.
+          </p>
         </div>
       </footer>
     </div>
