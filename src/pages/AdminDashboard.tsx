@@ -114,7 +114,7 @@ const AdminDashboard = () => {
     toast.success(`${label} copied!`);
   };
 
-  const joinLink = `${window.location.origin}/join/${event?.event_code}`;
+  const joinLink = `${window.location.origin}/#/join/${event?.event_code}`;
   const confirmed = participants.filter(p => p.attendance_confirmed);
   const notConfirmed = participants.filter(p => !p.attendance_confirmed);
   const overnightStay = participants.filter(p => p.overnight_stay === true);
@@ -203,7 +203,7 @@ const AdminDashboard = () => {
       created_by: session.user.id,
     }).select().single();
     if (error) { toast.error(error.message); return; }
-    const link = `${window.location.origin}/admin-invite/${(data as any).invite_code}`;
+    const link = `${window.location.origin}/#/admin-invite/${(data as any).invite_code}`;
     copyToClipboard(link, "Admin invite link");
   };
 
