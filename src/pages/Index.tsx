@@ -13,6 +13,18 @@ declare global {
 const Index = () => {
   const vantaRef = useRef<HTMLDivElement>(null);
   const [vantaEffect, setVantaEffect] = useState<any>(null);
+  const [session, setSession] = useState<{ name: string; eventId: string; eventName: string } | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("event-presence-session");
+    if (saved) {
+      try {
+        setSession(JSON.parse(saved));
+      } catch (e) {
+        localStorage.removeItem("event-presence-session");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!vantaEffect && window.VANTA && vantaRef.current) {
@@ -106,15 +118,24 @@ const Index = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
+              {session ? (
+                <Link to="/join" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto gradient-primary text-primary-foreground px-8 text-base h-12 shadow-lg hover:shadow-xl transition-shadow group">
+                    Continue as {session.name.split(' ')[0]}
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/join" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto gradient-primary text-primary-foreground px-8 text-base h-12 shadow-lg hover:shadow-xl transition-shadow">
+                    Join Event
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+              )}
               <Link to="/create" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto gradient-primary text-primary-foreground px-8 text-base h-12 shadow-lg hover:shadow-xl transition-shadow">
-                  Create Event
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
-              <Link to="/join" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 text-base h-12 bg-background/50 backdrop-blur-sm">
-                  Join Event
+                <Button size="lg" variant="outline" className="w-full sm:w-auto px-8 text-base h-12 bg-background/50 backdrop-blur-sm border-primary/20 hover:bg-primary/5">
+                  Organize Event
                 </Button>
               </Link>
             </motion.div>
@@ -126,9 +147,9 @@ const Index = () => {
           <div className="container mx-auto max-w-5xl">
             <div className="grid md:grid-cols-3 gap-6">
               {[
-                { icon: Zap, title: "Instant Setup", desc: "Create an event in seconds. Share the code. Done." },
-                { icon: Shield, title: "No Login Required", desc: "Participants confirm attendance with just their name and email." },
-                { icon: Clock, title: "Real-Time Tracking", desc: "Watch confirmations flow in live on your dashboard." },
+                { icon: Zap, title: "Team Collaboration", desc: "Join teams, share hex codes, and coordinate with your crew instantly." },
+                { icon: Shield, title: "Persistent Identity", desc: "Your session stays saved. Reload and jump back in without re-entering details." },
+                { icon: Clock, title: "Real-Time Tracking", desc: "Watch team confirmations flow in live on your professional dashboard." },
               ].map((f, i) => (
                 <motion.div
                   key={f.title}

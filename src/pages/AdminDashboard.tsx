@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search } from "lucide-react";
+import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search, Edit2, XCircle, QrCode, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 import * as XLSX from "xlsx";
+import QrScanner from "@/components/QrScanner";
 
 interface Event {
   id: string;
@@ -26,6 +28,16 @@ interface Participant {
   attendance_confirmed: boolean;
   confirmed_at: string | null;
   overnight_stay: boolean | null;
+  phone_number?: string;
+  team_id?: string;
+  team_role?: string;
+  teams?: { name: string; join_code: string } | null;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  join_code: string;
 }
 
 interface Admin {
@@ -50,6 +62,9 @@ const AdminDashboard = () => {
   const [newScheduleTime, setNewScheduleTime] = useState("");
   const [newScheduleTitle, setNewScheduleTitle] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   const loadData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -67,8 +82,11 @@ const AdminDashboard = () => {
     const { data: eventData } = await supabase.from("events").select("*").eq("id", eventId).single();
     if (eventData) setEvent(eventData as unknown as Event);
 
-    const { data: parts } = await supabase.from("participants").select("*").eq("event_id", eventId).order("name");
-    setParticipants((parts as Participant[]) || []);
+    const { data: parts } = await (supabase as any).from("participants").select("*, teams(name, join_code)").eq("event_id", eventId).order("name") as any;
+    setParticipants((parts as any[]) || []);
+
+    const { data: teamList } = await (supabase as any).from("teams").select("*").eq("event_id", eventId).order("name") as any;
+    setTeams((teamList as any[]) || []);
 
     try {
       const { data: adminList, error: adminError } = await supabase
@@ -100,8 +118,11 @@ const AdminDashboard = () => {
     loadData();
 
     // Real-time subscription
-    const channel = supabase
-      .channel(`participants-${eventId}`)
+    const channel = (supabase as any)
+      .channel(`admin-updates-${eventId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `event_id=eq.${eventId}` }, () => {
+        loadData();
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "participants", filter: `event_id=eq.${eventId}` }, () => {
         loadData();
       })
@@ -137,27 +158,71 @@ const AdminDashboard = () => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
-      const newParticipants = rows
-        .filter(r => r.Name && r.Email)
-        .map(r => ({
-          event_id: eventId!,
-          name: String(r.Name).trim(),
-          email: String(r.Email).trim().toLowerCase(),
-        }));
+      // Distinguish between Participant upload and Team upload
+      const isTeamUpload = rows.length > 0 && (rows[0].Team || rows[0]['Team Name']);
 
-      if (!newParticipants.length) {
-        toast.error("No valid rows found. Ensure columns are 'Name' and 'Email'.");
-        return;
+      if (isTeamUpload) {
+        const newTeams = rows
+          .filter(r => (r.Team || r['Team Name']))
+          .map(r => ({
+            event_id: eventId!,
+            name: String(r.Team || r['Team Name']).trim(),
+            join_code: Math.random().toString(36).substring(2, 8).toUpperCase()
+          }));
+
+        if (!newTeams.length) {
+          toast.error("No valid team names found.");
+          return;
+        }
+
+        const { error } = await (supabase as any).from("teams").insert(newTeams);
+        if (error) throw error;
+        toast.success(`Uploaded ${newTeams.length} teams`);
+      } else {
+        const newParticipants = rows
+          .filter(r => r.Name && r.Email)
+          .map(r => ({
+            event_id: eventId!,
+            name: String(r.Name).trim(),
+            email: String(r.Email).trim().toLowerCase(),
+          }));
+
+        if (!newParticipants.length) {
+          toast.error("No valid rows found. Ensure columns are 'Name' and 'Email' (or 'Team' for teams).");
+          return;
+        }
+
+        const { error } = await supabase.from("participants").upsert(newParticipants, { onConflict: "event_id,email" });
+        if (error) throw error;
+        toast.success(`Uploaded ${newParticipants.length} participants`);
       }
-
-      const { error } = await supabase.from("participants").upsert(newParticipants, { onConflict: "event_id,email" });
-      if (error) throw error;
-      toast.success(`${newParticipants.length} participants uploaded!`);
       loadData();
     } catch (err: any) {
       toast.error(err.message);
     }
     e.target.value = "";
+  };
+
+  const handleUpdateParticipant = async (pId: string, updates: any) => {
+    try {
+      const { error } = await supabase.from("participants").update(updates).eq("id", pId);
+      if (error) throw error;
+      toast.success("Participant updated");
+      setEditingParticipant(null);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+  const removeTeam = async (id: string) => {
+    try {
+      const { error } = await (supabase as any).from("teams").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Team removed");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   const removeParticipant = async (id: string) => {
@@ -216,6 +281,44 @@ const AdminDashboard = () => {
     }
     toast.success("Administrator removed");
     loadData();
+  };
+
+  const handleScan = async (participantId: string) => {
+    try {
+      // Basic validation of the scanned ID format (UUID check)
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participantId)) {
+        toast.error("Invalid QR code scanned.");
+        setIsScanning(false);
+        return;
+      }
+
+      const participant = participants.find(p => p.id === participantId);
+      if (!participant) {
+        toast.error("Participant not found for this event.");
+        setIsScanning(false);
+        return;
+      }
+
+      if (participant.attendance_confirmed) {
+        toast.info(`${participant.name} is already confirmed.`);
+        setIsScanning(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("participants")
+        .update({ attendance_confirmed: true, confirmed_at: new Date().toISOString() })
+        .eq("id", participantId);
+
+      if (error) throw error;
+
+      toast.success(`Check-in successful: ${participant.name}`);
+      setIsScanning(false);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process check-in");
+      setIsScanning(false);
+    }
   };
 
   const createAdminInvite = async () => {
@@ -277,15 +380,24 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5">
+            <Button 
+              onClick={() => setIsScanning(true)} 
+              variant="default" 
+              size="sm" 
+              className="gradient-primary text-primary-foreground h-9 gap-2 shadow-lg shadow-primary/20"
+            >
+              <Camera className="w-4 h-4" />
+              Scan Attendance
+            </Button>
+            <div className="flex items-center gap-1.5 pl-4 border-l border-border/50">
               <UserCheck className="w-4 h-4 text-success" />
               <span className="font-semibold">{confirmed.length}</span>
-              <span className="text-muted-foreground">confirmed</span>
+              <span className="text-muted-foreground underline decoration-success/30 underline-offset-4 decoration-dotted">confirmed</span>
             </div>
             <div className="flex items-center gap-1.5">
               <UserX className="w-4 h-4 text-destructive" />
               <span className="font-semibold">{notConfirmed.length}</span>
-              <span className="text-muted-foreground">pending</span>
+              <span className="text-muted-foreground underline decoration-destructive/30 underline-offset-4 decoration-dotted">pending</span>
             </div>
           </div>
         </div>
@@ -303,6 +415,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="participants" className="w-full">
           <TabsList className="mb-4 w-full justify-start overflow-x-auto no-scrollbar flex-nowrap bg-transparent gap-2 h-auto p-0">
             <TabsTrigger value="participants" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Users className="w-4 h-4 mr-2" /> Participants</TabsTrigger>
+            <TabsTrigger value="teams" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Users className="w-4 h-4 mr-2" /> Teams</TabsTrigger>
             <TabsTrigger value="schedule" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Clock className="w-4 h-4 mr-2" /> Schedule</TabsTrigger>
             <TabsTrigger value="admins" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><UserCheck className="w-4 h-4 mr-2" /> Admins</TabsTrigger>
             {event.is_overnight && <TabsTrigger value="overnight" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Moon className="w-4 h-4 mr-2" /> Overnight</TabsTrigger>}
@@ -330,17 +443,32 @@ const AdminDashboard = () => {
                   <table className="w-full text-sm min-w-full">
                     <thead><tr className="border-b border-border bg-secondary/30">
                       <th className="text-left p-3 font-medium">Name</th>
+                      <th className="text-left p-3 font-medium">Team</th>
+                      <th className="text-left p-3 font-medium">Role</th>
                       <th className="text-left p-3 font-medium">Email</th>
                       <th className="text-left p-3 font-medium">Confirmed At</th>
                       <th className="p-3"></th>
                     </tr></thead>
                     <tbody>
-                      {confirmed.map(p => (
-                        <tr key={p.id} className="border-b border-border/50">
-                          <td className="p-3">{p.name}</td>
+                      {(confirmed as any[]).map(p => (
+                        <tr key={p.id} className="border-b border-border/50 group">
+                          <td className="p-3">
+                            <span className="font-medium text-foreground">{p.name}</span>
+                          </td>
+                          <td className="p-3">
+                            {p.teams ? <span className="bg-primary/5 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{p.teams.name}</span> : <span className="text-muted-foreground">-</span>}
+                          </td>
+                          <td className="p-3">
+                            <span className="capitalize text-xs">{p.team_role || 'Member'}</span>
+                          </td>
                           <td className="p-3 text-muted-foreground">{p.email}</td>
                           <td className="p-3 text-muted-foreground">{p.confirmed_at ? format(new Date(p.confirmed_at), "MMM d, h:mm a") : "-"}</td>
-                          <td className="p-3"><Button variant="ghost" size="sm" onClick={() => removeParticipant(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button></td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="sm" onClick={() => setEditingParticipant(p)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => removeParticipant(p.id)} className="text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -377,6 +505,46 @@ const AdminDashboard = () => {
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="teams">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+                <Users className="w-4 h-4" /> Event Teams ({teams.length})
+              </h3>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <Button variant="outline" size="sm" asChild className="border-primary/20 hover:bg-primary/5">
+                  <span><Upload className="w-4 h-4 mr-1" /> Upload Teams CSV</span>
+                </Button>
+                <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+              </label>
+            </div>
+            {teams.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No teams created yet. Participants will create teams as they join, or you can upload a list above.</p>
+            ) : (
+              <div className="glass-card rounded-xl overflow-x-auto no-scrollbar">
+                <table className="w-full text-sm min-w-full">
+                  <thead><tr className="border-b border-border bg-secondary/30">
+                    <th className="text-left p-3 font-medium">Team Name</th>
+                    <th className="text-left p-3 font-medium">Join Code</th>
+                    <th className="p-3"></th>
+                  </tr></thead>
+                  <tbody>
+                    {teams.map(t => (
+                      <tr key={t.id} className="border-b border-border/50 group">
+                        <td className="p-3 font-medium">{t.name}</td>
+                        <td className="p-3">
+                          <code className="bg-primary/5 text-primary px-2 py-1 rounded font-mono font-bold">{t.join_code}</code>
+                        </td>
+                        <td className="p-3 text-right">
+                           <Button variant="ghost" size="sm" onClick={() => removeTeam(t.id)} className="text-destructive group-hover:opacity-100 opacity-0 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="schedule">
@@ -495,6 +663,102 @@ const AdminDashboard = () => {
           <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">EventPresence • Professional Event Management</p>
         </div>
       </footer>
+      <AnimatePresence>
+        {editingParticipant && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass-card w-full max-w-md p-6 shadow-2xl border-primary/20"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold">Edit Participant</h3>
+                <Button variant="ghost" size="sm" onClick={() => setEditingParticipant(null)}><XCircle className="w-4 h-4" /></Button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <Label>Full Name</Label>
+                  <Input 
+                    value={editingParticipant.name} 
+                    onChange={e => setEditingParticipant({ ...editingParticipant, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Phone Number</Label>
+                  <Input 
+                    value={editingParticipant.phone_number || ""} 
+                    onChange={e => setEditingParticipant({ ...editingParticipant, phone_number: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Role</Label>
+                  <select 
+                    className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={editingParticipant.team_role || "member"}
+                    onChange={e => setEditingParticipant({ ...editingParticipant, team_role: e.target.value })}
+                  >
+                    <option value="member">Member</option>
+                    <option value="leader">Leader</option>
+                    <option value="admin">Admin (Event)</option>
+                  </select>
+                </div>
+                
+                <div className="pt-4 flex gap-2">
+                  <Button 
+                    className="flex-1 gradient-primary text-primary-foreground"
+                    onClick={() => handleUpdateParticipant(editingParticipant.id, {
+                      name: editingParticipant.name,
+                      phone_number: editingParticipant.phone_number,
+                      team_role: editingParticipant.team_role
+                    })}
+                  >
+                    Save Changes
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingParticipant(null)}>Cancel</Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {isScanning && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="glass-card w-full max-w-sm p-6 shadow-2xl border-primary/20 relative"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <QrCode className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-bold">Scan QR Code</h3>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setIsScanning(false)} className="h-8 w-8 p-0">
+                  <XCircle className="w-5 h-5 text-muted-foreground" />
+                </Button>
+              </div>
+
+              <div className="mb-6">
+                <QrScanner onScanSuccess={handleScan} />
+              </div>
+
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setIsScanning(false)}
+              >
+                Close Scanner
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

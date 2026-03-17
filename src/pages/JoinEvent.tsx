@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarCheck, ArrowLeft, CheckCircle2, Clock } from "lucide-react";
+import { 
+  CalendarCheck, 
+  ArrowLeft, 
+  CheckCircle2, 
+  Clock,
+  Edit2,
+  Save,
+  XCircle,
+  Hash,
+  Users
+} from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,15 +29,56 @@ const JoinEvent = () => {
   const [eventCode, setEventCode] = useState(urlCode || "");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [teamName, setTeamName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [eventName, setEventName] = useState("");
+  const [participantData, setParticipantData] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Sync state with URL parameter
-  useState(() => {
+  // Sync state with URL parameter and check session
+  useEffect(() => {
     if (urlCode && !eventCode) setEventCode(urlCode);
-  });
+    
+    const checkSession = async () => {
+      const saved = localStorage.getItem("event-presence-session");
+      if (saved) {
+        try {
+          const { participantId } = JSON.parse(saved);
+          const { data, error } = await supabase
+            .from('participants')
+            .select(`
+              *,
+              events(event_name, schedule),
+              teams(name, join_code)
+            `)
+            .eq('id', participantId)
+            .single();
+            
+          if (data && !error) {
+            const d = data as any;
+            setConfirmed(true);
+            setEventName(d.events.event_name);
+            setSchedule(d.events.schedule || []);
+            setParticipantData({
+              ...d,
+              team_name: d.teams?.name,
+              team_join_code: d.teams?.join_code
+            });
+            setName(d.name);
+            setEmail(d.email);
+            setPhone(d.phone_number || "");
+          }
+        } catch (e) {
+          console.error("Session load failed", e);
+        }
+      }
+    };
+    checkSession();
+  }, [urlCode]);
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,23 +88,90 @@ const JoinEvent = () => {
         _event_code: eventCode.toUpperCase().trim(),
         _email: email.trim(),
         _name: name.trim(),
+        _phone_number: phone.trim(),
+        _team_name: teamName.trim(),
+        _team_join_code: joinCode.trim() || null
       });
 
-      if (error) {
-        console.error("RPC Error:", error);
-        throw error;
-      }
+      if (error) throw error;
       const result = data as any;
       if (!result.success) {
-        console.warn("Confirmation failed:", result.error);
         toast.error(result.error);
         return;
       }
 
+      const sessionData = {
+        participantId: result.id,
+        eventId: result.event_id,
+        eventName: result.event_name,
+        name: name.trim()
+      };
+      
+      localStorage.setItem("event-presence-session", JSON.stringify(sessionData));
+      
       setConfirmed(true);
-      setSchedule(result.schedule || []);
+      setParticipantData(result);
+      setSchedule((result.schedule as any) || []);
       setEventName(result.event_name || "");
-      toast.success("Attendance confirmed!");
+      toast.success("Presence recorded!");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!confirmed || !participantData?.id) return;
+
+    const channel = supabase
+      .channel(`participant-status-${participantData.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "participants",
+          filter: `id=eq.${participantData.id}`
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated.attendance_confirmed) {
+            setParticipantData(prev => prev ? { ...prev, attendance_confirmed: true, confirmed_at: updated.confirmed_at } : null);
+            toast.success("Attendance confirmed by Admin! 🎉");
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [confirmed, participantData?.id]);
+
+  const handleUpdateProfile = async () => {
+    if (!participantData) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('participants')
+        .update({
+          name: name.trim(),
+          phone_number: phone.trim()
+        } as any)
+        .eq('id', participantData.id);
+
+      if (error) throw error;
+      
+      const saved = localStorage.getItem("event-presence-session");
+      if (saved) {
+        const newSession = { ...JSON.parse(saved), name: name.trim() };
+        localStorage.setItem("event-presence-session", JSON.stringify(newSession));
+      }
+      
+      setParticipantData({ ...participantData, name: name.trim(), phone_number: phone.trim() });
+      setIsEditing(false);
+      toast.success("Profile updated!");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -109,6 +227,21 @@ const JoinEvent = () => {
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" required />
                 </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 234 567 890" required />
+                </div>
+                <div className="pt-2 border-t border-border/50 mt-4">
+                  <Label htmlFor="team">Team Name (Optional)</Label>
+                  <Input id="team" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="e.g. Dream Team" />
+                  <p className="text-[10px] text-muted-foreground mt-1">If you're the first member, no code needed. Others will need your team's join code.</p>
+                </div>
+                {teamName && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+                    <Label htmlFor="joinCode">Team Join Code</Label>
+                    <Input id="joinCode" value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} className="uppercase font-mono" />
+                  </motion.div>
+                )}
                 <Button type="submit" className="w-full gradient-primary text-primary-foreground" disabled={loading}>
                   {loading ? "Confirming..." : "Confirm Attendance"}
                 </Button>
@@ -123,11 +256,113 @@ const JoinEvent = () => {
             >
               <div className="text-center mb-6">
                 <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 className="w-8 h-8 text-success" />
+                  <CheckCircle2 className={`w-8 h-8 ${participantData?.attendance_confirmed ? "text-success" : "text-muted-foreground opacity-50"}`} />
                 </div>
-                <h2 className="text-xl font-semibold">You're confirmed!</h2>
-                <p className="text-muted-foreground text-sm mt-1">Your attendance for <strong>{eventName}</strong> has been recorded.</p>
+                <div className="flex flex-col items-center justify-center gap-1 mb-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-semibold">
+                      {isEditing ? "Edit Your Details" : (participantData?.attendance_confirmed ? "Attendance Confirmed!" : "Presence Recorded!")}
+                    </h2>
+                    {!isEditing && (
+                      <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="h-8 w-8 p-0">
+                        <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </div>
+                  {!isEditing && (
+                    <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${participantData?.attendance_confirmed ? "bg-success/20 text-success border border-success/30" : "bg-warning/20 text-warning border border-warning/30"}`}>
+                      {participantData?.attendance_confirmed ? "Confirmed" : "Pending Scan"}
+                    </div>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-sm mt-2">
+                  {isEditing 
+                    ? "Update your information below." 
+                    : (participantData?.attendance_confirmed 
+                        ? `Welcome to ${eventName}! Your attendance is officially confirmed.` 
+                        : `You've joined ${eventName}. Please show your QR code to an admin to confirm entrance.`)}
+                </p>
               </div>
+
+              {!isEditing && participantData?.id && (
+                <div className="mb-8 flex flex-col items-center">
+                  <div className="bg-white p-3 rounded-2xl shadow-xl border border-primary/10 mb-2">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${participantData.id}`} 
+                      alt="Check-in QR"
+                      className="w-40 h-40"
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Show this QR to Admin</span>
+                </div>
+              )}
+
+              {!isEditing && participantData?.team_name && (
+                <div className="mb-8 p-4 rounded-xl bg-primary/5 border border-primary/10 text-center relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Users className="w-12 h-12" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Your Team</span>
+                  <div className="font-bold text-lg mb-3">{participantData.team_name}</div>
+                  
+                  <div className="inline-flex flex-col items-center">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1">Team Join Code</span>
+                    <div className="flex items-center gap-2 bg-background px-4 py-2 rounded-lg border border-primary/20 shadow-sm">
+                      <Hash className="w-4 h-4 text-primary" />
+                      <code className="text-xl font-mono font-black text-primary tracking-widest">
+                        {participantData.team_join_code}
+                      </code>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2 italic">Share this code with your teammates to join this team!</p>
+                  </div>
+                </div>
+              )}
+
+              {isEditing ? (
+                <div className="space-y-4 mb-8 p-6 glass-card border-primary/20">
+                  <div>
+                    <Label htmlFor="edit-name">Full Name</Label>
+                    <Input id="edit-name" value={name} onChange={e => setName(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-phone">Phone Number</Label>
+                    <Input id="edit-phone" value={phone} onChange={e => setPhone(e.target.value)} />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button onClick={handleUpdateProfile} className="flex-1 gradient-primary text-primary-foreground" disabled={loading}>
+                      <Save className="w-4 h-4 mr-2" /> Save Changes
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsEditing(false)} className="px-3">
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : participantData?.team_name && (
+                <div className="mb-8 p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-widest text-primary font-bold">Team Profile</span>
+                      <h4 className="text-lg font-bold">{participantData.team_name}</h4>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Your Role</span>
+                      <p className="text-sm font-semibold capitalize">{participantData.team_role || 'Member'}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-primary/10">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Join Code</span>
+                      <p className="font-mono font-bold text-primary flex items-center gap-1.5">
+                        <Hash className="w-3 h-3" /> {participantData.team_join_code}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Share This</span>
+                      <p className="text-[10px] leading-tight">Give this code to your other team members.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {schedule.length > 0 && (
                 <div>
