@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search, Edit2, XCircle, QrCode, Camera, DoorOpen } from "lucide-react";
+import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search, Edit2, XCircle, QrCode, Camera, DoorOpen, Code, Github } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +32,9 @@ interface Participant {
   team_id?: string;
   team_role?: string;
   teams?: { name: string; join_code: string } | null;
+  room_id?: string;
+  track?: string;
+  github_repo?: string;
 }
 
 interface Team {
@@ -678,7 +681,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="rooms">
-            <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end justify-between">
+            <div className="mb-6 flex flex-col sm:flex-row gap-4 items-end justify-between">
               <div className="flex items-center gap-2 flex-1 max-w-sm">
                 <Input placeholder="New Room Name" value={newRoomName} onChange={e => setNewRoomName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddRoom()} />
                 <Button onClick={handleAddRoom} className="gradient-primary text-primary-foreground"><Plus className="w-4 h-4 mr-1" /> Add</Button>
@@ -688,23 +691,54 @@ const AdminDashboard = () => {
             {rooms.length === 0 ? (
               <p className="text-sm text-muted-foreground">No rooms created yet. Add a room to allow participants to select it.</p>
             ) : (
-              <div className="glass-card rounded-xl overflow-x-auto no-scrollbar">
-                <table className="w-full text-sm min-w-full">
-                  <thead><tr className="border-b border-border bg-secondary/30">
-                    <th className="text-left p-3 font-medium">Room Name</th>
-                    <th className="p-3"></th>
-                  </tr></thead>
-                  <tbody>
-                    {rooms.map(r => (
-                      <tr key={r.id} className="border-b border-border/50 group">
-                        <td className="p-3 font-medium">{r.name}</td>
-                        <td className="p-3 text-right">
-                           <Button variant="ghost" size="sm" onClick={() => removeRoom(r.id)} className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-6">
+                {rooms.map(r => {
+                  const roomParticipants = participants.filter(p => p.room_id === r.id && p.teams?.name);
+                  const roomTeamsMap = new Map();
+                  roomParticipants.forEach(p => {
+                    if (!roomTeamsMap.has(p.teams?.name)) {
+                      roomTeamsMap.set(p.teams?.name, {
+                        name: p.teams?.name,
+                        track: p.track,
+                        github_repo: p.github_repo
+                      });
+                    }
+                  });
+                  const roomTeams = Array.from(roomTeamsMap.values());
+
+                  return (
+                    <div key={r.id} className="glass-card rounded-xl p-5 relative group border border-border/50">
+                      <div className="flex justify-between items-center mb-4 pb-3 border-b border-border/50">
+                        <h4 className="text-lg font-bold text-primary flex items-center gap-2">
+                          <DoorOpen className="w-5 h-5" /> {r.name}
+                        </h4>
+                        <Button variant="ghost" size="sm" onClick={() => removeRoom(r.id)} className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      
+                      {roomTeams.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">No teams in this room yet.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {roomTeams.map((team, idx) => (
+                            <div key={idx} className="bg-secondary/30 rounded-lg p-3 border border-border/50 flex flex-col">
+                              <span className="font-bold mb-3">{team.name}</span>
+                              <div className="flex flex-col gap-1.5 mt-auto">
+                                <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Code className="w-3 h-3"/> {team.track || 'No track'}</span>
+                                {team.github_repo ? (
+                                  <a href={team.github_repo} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1.5"><Github className="w-3 h-3"/> View Repo</a>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Github className="w-3 h-3 opacity-50"/> No repo</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
