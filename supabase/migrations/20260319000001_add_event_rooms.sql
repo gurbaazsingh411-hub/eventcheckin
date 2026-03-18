@@ -40,7 +40,8 @@ CREATE OR REPLACE FUNCTION public.update_participant_details(
   p_id UUID,
   p_room_id TEXT DEFAULT NULL,
   p_track TEXT DEFAULT NULL,
-  p_github_repo TEXT DEFAULT NULL
+  p_github_repo TEXT DEFAULT NULL,
+  p_overnight_stay BOOLEAN DEFAULT NULL
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -57,15 +58,16 @@ BEGIN
   -- Get the team_id of this participant
   SELECT team_id INTO v_team_id FROM public.participants WHERE id = p_id;
 
-  -- Update this participant
+  -- Update this participant (includes overnight_stay)
   UPDATE public.participants
   SET 
     room_id = v_real_room_id,
     track = p_track,
-    github_repo = p_github_repo
+    github_repo = p_github_repo,
+    overnight_stay = p_overnight_stay
   WHERE id = p_id;
 
-  -- If they are in a team, update the rest of the team
+  -- If they are in a team, update the rest of the team (EXCLUDES overnight_stay)
   IF v_team_id IS NOT NULL THEN
     UPDATE public.participants
     SET 

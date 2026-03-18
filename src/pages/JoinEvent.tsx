@@ -17,7 +17,8 @@ import {
   MapPin,
   Code,
   Github,
-  Loader2
+  Loader2,
+  Moon
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -53,6 +54,8 @@ const JoinEvent = () => {
   const [track, setTrack] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
   const [isUpdatingDetails, setIsUpdatingDetails] = useState(false);
+  const [isOvernight, setIsOvernight] = useState(false);
+  const [overnightStay, setOvernightStay] = useState(false);
 
   // Sync state with URL parameter and check session
   useEffect(() => {
@@ -67,7 +70,7 @@ const JoinEvent = () => {
             .from('participants')
             .select(`
               *,
-              events(event_name, schedule),
+              events(event_name, schedule, is_overnight),
               teams(name, join_code)
             `)
             .eq('id', participantId)
@@ -78,6 +81,7 @@ const JoinEvent = () => {
             setConfirmed(true);
             setEventName(d.events.event_name);
             setSchedule(d.events.schedule || []);
+            setIsOvernight(d.events.is_overnight || false);
             setParticipantData({
               ...d,
               team_name: d.teams?.name,
@@ -89,6 +93,7 @@ const JoinEvent = () => {
             if (d.room_id) setSelectedRoom(d.room_id);
             if (d.track) setTrack(d.track);
             if (d.github_repo) setGithubRepo(d.github_repo);
+            if (d.overnight_stay !== null) setOvernightStay(d.overnight_stay);
           }
         } catch (e) {
           console.error("Session load failed", e);
@@ -135,6 +140,10 @@ const JoinEvent = () => {
       setParticipantData(result);
       setSchedule((result.schedule as any) || []);
       setEventName(result.event_name || "");
+      
+      const { data: evData } = await supabase.from('events').select('is_overnight').eq('id', result.event_id).single();
+      if (evData) setIsOvernight(evData.is_overnight);
+
       toast.success("Presence recorded!");
     } catch (err: any) {
       toast.error(err.message);
@@ -217,10 +226,11 @@ const JoinEvent = () => {
         p_id: participantData.id,
         p_room_id: selectedRoom || null,
         p_track: track || null,
-        p_github_repo: githubRepo || null
+        p_github_repo: githubRepo || null,
+        p_overnight_stay: overnightStay
       });
       if (error) throw error;
-      setParticipantData({ ...participantData, room_id: selectedRoom, track, github_repo: githubRepo });
+      setParticipantData({ ...participantData, room_id: selectedRoom, track, github_repo: githubRepo, overnight_stay: overnightStay });
       toast.success("Project details saved!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save details.");
@@ -368,6 +378,12 @@ const JoinEvent = () => {
                       <Label htmlFor="github" className="flex items-center gap-2 mb-1.5"><Github className="w-3.5 h-3.5" /> GitHub Repo URL</Label>
                       <Input id="github" type="url" value={githubRepo} onChange={e => setGithubRepo(e.target.value)} placeholder="https://github.com/your/repo" />
                     </div>
+                    {isOvernight && (
+                      <div className="flex items-center space-x-2 pt-2 pb-1 border-t border-border/50">
+                        <input type="checkbox" id="overnight" className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-background" checked={overnightStay} onChange={e => setOvernightStay(e.target.checked)} />
+                        <Label htmlFor="overnight" className="text-sm font-medium leading-none flex items-center gap-2 cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"><Moon className="w-3.5 h-3.5" /> Request Overnight Stay</Label>
+                      </div>
+                    )}
                     <Button type="submit" className="w-full" disabled={isUpdatingDetails}>
                       {isUpdatingDetails ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Details"}
                     </Button>
