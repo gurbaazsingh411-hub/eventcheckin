@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, Plus, LogOut, ArrowRight } from "lucide-react";
+import { CalendarCheck, Plus, LogOut, ArrowRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -52,6 +52,25 @@ const Dashboard = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  const handleDeleteEvent = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!window.confirm("Are you sure you want to delete this event? This action cannot be undone and will delete all participants and teams associated with it.")) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("events").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Event deleted successfully");
+      loadEvents();
+    } catch (err: any) {
+      console.error("Error deleting event:", err);
+      toast.error(err.message || "Failed to delete event. Make sure you are the creator.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -106,7 +125,18 @@ const Dashboard = () => {
                     {event.is_overnight && <span className="px-2 py-0.5 rounded bg-accent/10 text-accent font-medium">Overnight</span>}
                   </div>
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={(e) => handleDeleteEvent(e, event.id)}
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete Event"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
+                  <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
               </Link>
             ))}
           </div>
