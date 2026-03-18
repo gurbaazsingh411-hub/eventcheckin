@@ -66,6 +66,12 @@ const AdminDashboard = () => {
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newParticipantName, setNewParticipantName] = useState("");
+  const [newParticipantEmail, setNewParticipantEmail] = useState("");
+  const [newParticipantPhone, setNewParticipantPhone] = useState("");
+  const [newParticipantTeam, setNewParticipantTeam] = useState("");
+
   const loadData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate("/auth"); return; }
@@ -253,6 +259,58 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleAddTeam = async () => {
+    if (!event || !newTeamName.trim()) return;
+    try {
+      const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const { error } = await supabase.from("teams" as any).insert([{ 
+        event_id: event.id, 
+        name: newTeamName.trim(),
+        join_code: joinCode
+      }]);
+      if (error) throw error;
+      toast.success("Team added!");
+      setNewTeamName("");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add team");
+    }
+  };
+
+  const handleAddParticipant = async () => {
+    if (!event || !newParticipantName.trim() || !newParticipantEmail.trim()) return;
+    try {
+      let teamId = null;
+      if (newParticipantTeam.trim()) {
+        const team = teams.find(t => t.name.toLowerCase() === newParticipantTeam.trim().toLowerCase());
+        if (!team) {
+          toast.error("Team not found. Please create the team first.");
+          return;
+        }
+        teamId = team.id;
+      }
+
+      const { error } = await supabase.from("participants").insert([{
+        event_id: event.id,
+        name: newParticipantName.trim(),
+        email: newParticipantEmail.trim(),
+        phone_number: newParticipantPhone.trim() || null,
+        team_id: teamId,
+        attendance_confirmed: false,
+        confirmed_at: null
+      }]);
+      if (error) throw error;
+      toast.success("Participant added!");
+      setNewParticipantName("");
+      setNewParticipantEmail("");
+      setNewParticipantPhone("");
+      setNewParticipantTeam("");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add participant");
+    }
+  };
+
   const removeScheduleItem = async (index: number) => {
     if (!event) return;
     try {
@@ -422,13 +480,21 @@ const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="participants">
-            <div className="mb-4">
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <Button variant="outline" size="sm" asChild>
-                  <span><Upload className="w-4 h-4 mr-1" /> Upload CSV/XLSX</span>
-                </Button>
-                <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
-              </label>
+            <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1 flex flex-col sm:flex-row gap-2 w-full">
+                <Input placeholder="Name" value={newParticipantName} onChange={e => setNewParticipantName(e.target.value)} />
+                <Input placeholder="Email" type="email" value={newParticipantEmail} onChange={e => setNewParticipantEmail(e.target.value)} />
+                <Input placeholder="Team (Optional)" value={newParticipantTeam} onChange={e => setNewParticipantTeam(e.target.value)} />
+                <Button onClick={handleAddParticipant} className="gradient-primary text-primary-foreground whitespace-nowrap"><Plus className="w-4 h-4 mr-1"/> Add</Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <Button variant="outline" size="sm" asChild>
+                    <span><Upload className="w-4 h-4 mr-1" /> Import CSV</span>
+                  </Button>
+                  <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+                </label>
+              </div>
             </div>
 
             {/* Confirmed */}
@@ -508,17 +574,19 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="teams">
-            <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
-                <Users className="w-4 h-4" /> Event Teams ({teams.length})
-              </h3>
+            <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end justify-between">
+              <div className="flex items-center gap-2 flex-1 max-w-sm">
+                <Input placeholder="New Team Name" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTeam()} />
+                <Button onClick={handleAddTeam} className="gradient-primary text-primary-foreground"><Plus className="w-4 h-4 mr-1" /> Add</Button>
+              </div>
               <label className="inline-flex items-center gap-2 cursor-pointer">
                 <Button variant="outline" size="sm" asChild className="border-primary/20 hover:bg-primary/5">
-                  <span><Upload className="w-4 h-4 mr-1" /> Upload Teams CSV</span>
+                  <span><Upload className="w-4 h-4 mr-1" /> Import CSV</span>
                 </Button>
                 <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
               </label>
             </div>
+
             {teams.length === 0 ? (
               <p className="text-sm text-muted-foreground">No teams created yet. Participants will create teams as they join, or you can upload a list above.</p>
             ) : (
