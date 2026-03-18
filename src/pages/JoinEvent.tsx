@@ -13,7 +13,11 @@ import {
   Save,
   XCircle,
   Hash,
-  Users
+  Users,
+  MapPin,
+  Code,
+  Github,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -38,6 +42,17 @@ const JoinEvent = () => {
   const [eventName, setEventName] = useState("");
   const [participantData, setParticipantData] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
+
+  interface Room {
+    id: string;
+    name: string;
+  }
+
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState("");
+  const [track, setTrack] = useState("");
+  const [githubRepo, setGithubRepo] = useState("");
+  const [isUpdatingDetails, setIsUpdatingDetails] = useState(false);
 
   // Sync state with URL parameter and check session
   useEffect(() => {
@@ -71,6 +86,9 @@ const JoinEvent = () => {
             setName(d.name);
             setEmail(d.email);
             setPhone(d.phone_number || "");
+            if (d.room_id) setSelectedRoom(d.room_id);
+            if (d.track) setTrack(d.track);
+            if (d.github_repo) setGithubRepo(d.github_repo);
           }
         } catch (e) {
           console.error("Session load failed", e);
@@ -82,6 +100,10 @@ const JoinEvent = () => {
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!teamName.trim()) {
+      toast.error("Team Name is required.");
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc("confirm_attendance", {
@@ -120,6 +142,13 @@ const JoinEvent = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (participantData?.event_id) {
+      (supabase as any).from("rooms").select("*").eq("event_id", participantData.event_id).order("name")
+        .then(({ data }: any) => { if (data) setRooms(data as Room[]); });
+    }
+  }, [participantData?.event_id]);
 
   useEffect(() => {
     if (!confirmed || !participantData?.id) return;
@@ -179,6 +208,27 @@ const JoinEvent = () => {
     }
   };
 
+  const handleSaveProjectDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!participantData?.id) return;
+    setIsUpdatingDetails(true);
+    try {
+      const { error } = await (supabase as any).rpc('update_participant_details', {
+        p_id: participantData.id,
+        p_room_id: selectedRoom || null,
+        p_track: track || null,
+        p_github_repo: githubRepo || null
+      });
+      if (error) throw error;
+      setParticipantData({ ...participantData, room_id: selectedRoom, track, github_repo: githubRepo });
+      toast.success("Project details saved!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save details.");
+    } finally {
+      setIsUpdatingDetails(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="container mx-auto max-w-lg">
@@ -232,8 +282,8 @@ const JoinEvent = () => {
                   <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 234 567 890" required />
                 </div>
                 <div className="pt-2 border-t border-border/50 mt-4">
-                  <Label htmlFor="team">Team Name (Optional)</Label>
-                  <Input id="team" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="e.g. Dream Team" />
+                  <Label htmlFor="team">Team Name</Label>
+                  <Input id="team" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="e.g. Dream Team" required />
                   <p className="text-[10px] text-muted-foreground mt-1">If you're the first member, no code needed. Others will need your team's join code.</p>
                 </div>
                 {teamName && (
@@ -294,6 +344,34 @@ const JoinEvent = () => {
                     />
                   </div>
                   <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Show this QR to Admin</span>
+                </div>
+              )}
+
+              {participantData?.attendance_confirmed && (
+                <div className="mb-8 p-6 rounded-xl bg-card border border-border shadow-md">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <Code className="w-4 h-4 text-primary" /> Project Details
+                  </h3>
+                  <form onSubmit={handleSaveProjectDetails} className="space-y-4 text-left">
+                    <div>
+                      <Label htmlFor="room" className="flex items-center gap-2 mb-1.5"><MapPin className="w-3.5 h-3.5" /> Room <span className="text-muted-foreground font-normal text-xs">(Ask Organizer)</span></Label>
+                      <select id="room" value={selectedRoom} onChange={e => setSelectedRoom(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        <option value="">Select a room...</option>
+                        {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="track" className="mb-1.5 block">Track</Label>
+                      <Input id="track" value={track} onChange={e => setTrack(e.target.value)} placeholder="e.g. AI/ML, Web3..." />
+                    </div>
+                    <div>
+                      <Label htmlFor="github" className="flex items-center gap-2 mb-1.5"><Github className="w-3.5 h-3.5" /> GitHub Repo URL</Label>
+                      <Input id="github" type="url" value={githubRepo} onChange={e => setGithubRepo(e.target.value)} placeholder="https://github.com/your/repo" />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isUpdatingDetails}>
+                      {isUpdatingDetails ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Details"}
+                    </Button>
+                  </form>
                 </div>
               )}
 

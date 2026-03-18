@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search, Edit2, XCircle, QrCode, Camera } from "lucide-react";
+import { CalendarCheck, ArrowLeft, Copy, Upload, Plus, Trash2, Users, UserCheck, UserX, Moon, Clock, Link as LinkIcon, UserMinus, Search, Edit2, XCircle, QrCode, Camera, DoorOpen } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import * as XLSX from "xlsx";
 import QrScanner from "@/components/QrScanner";
 
-interface Event {
+interface EventType {
   id: string;
   event_name: string;
   event_date: string;
@@ -40,6 +40,11 @@ interface Team {
   join_code: string;
 }
 
+interface Room {
+  id: string;
+  name: string;
+}
+
 interface Admin {
   id: string;
   user_id: string;
@@ -54,7 +59,7 @@ interface Admin {
 const AdminDashboard = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventType | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,10 +68,12 @@ const AdminDashboard = () => {
   const [newScheduleTitle, setNewScheduleTitle] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [teams, setTeams] = useState<Team[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
   const [newTeamName, setNewTeamName] = useState("");
+  const [newRoomName, setNewRoomName] = useState("");
   const [newParticipantName, setNewParticipantName] = useState("");
   const [newParticipantEmail, setNewParticipantEmail] = useState("");
   const [newParticipantPhone, setNewParticipantPhone] = useState("");
@@ -86,13 +93,20 @@ const AdminDashboard = () => {
     if (!admin) { toast.error("Access denied"); navigate("/dashboard"); return; }
 
     const { data: eventData } = await supabase.from("events").select("*").eq("id", eventId).single();
-    if (eventData) setEvent(eventData as unknown as Event);
+    if (eventData) setEvent(eventData as unknown as EventType);
 
     const { data: parts } = await (supabase as any).from("participants").select("*, teams(name, join_code)").eq("event_id", eventId).order("name") as any;
     setParticipants((parts as any[]) || []);
 
     const { data: teamList } = await (supabase as any).from("teams").select("*").eq("event_id", eventId).order("name") as any;
     setTeams((teamList as any[]) || []);
+
+    const { data: roomList } = await (supabase as any)
+      .from("rooms")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at");
+    setRooms((roomList as any[]) || []);
 
     try {
       const { data: adminList, error: adminError } = await supabase
@@ -127,6 +141,9 @@ const AdminDashboard = () => {
     const channel = (supabase as any)
       .channel(`admin-updates-${eventId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `event_id=eq.${eventId}` }, () => {
+        loadData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "rooms", filter: `event_id=eq.${eventId}` }, () => {
         loadData();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "participants", filter: `event_id=eq.${eventId}` }, () => {
@@ -277,8 +294,38 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleAddRoom = async () => {
+    if (!event || !newRoomName.trim()) return;
+    try {
+      const { error } = await (supabase as any).from("rooms").insert([{ 
+        event_id: event.id, 
+        name: newRoomName.trim()
+      }]);
+      if (error) throw error;
+      toast.success("Room added!");
+      setNewRoomName("");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add room");
+    }
+  };
+
+  const removeRoom = async (id: string) => {
+    try {
+      const { error } = await (supabase as any).from("rooms").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Room removed");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to remove room");
+    }
+  };
+
   const handleAddParticipant = async () => {
-    if (!event || !newParticipantName.trim() || !newParticipantEmail.trim()) return;
+    if (!event || !newParticipantName.trim() || !newParticipantEmail.trim() || !newParticipantTeam.trim()) {
+      toast.error("Please fill in all fields including Team Name.");
+      return;
+    }
     try {
       let teamId = null;
       if (newParticipantTeam.trim()) {
@@ -474,6 +521,7 @@ const AdminDashboard = () => {
           <TabsList className="mb-4 w-full justify-start overflow-x-auto no-scrollbar flex-nowrap bg-transparent gap-2 h-auto p-0">
             <TabsTrigger value="participants" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Users className="w-4 h-4 mr-2" /> Participants</TabsTrigger>
             <TabsTrigger value="teams" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Users className="w-4 h-4 mr-2" /> Teams</TabsTrigger>
+            <TabsTrigger value="rooms" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><DoorOpen className="w-4 h-4 mr-2" /> Rooms</TabsTrigger>
             <TabsTrigger value="schedule" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Clock className="w-4 h-4 mr-2" /> Schedule</TabsTrigger>
             <TabsTrigger value="admins" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><UserCheck className="w-4 h-4 mr-2" /> Admins</TabsTrigger>
             {event.is_overnight && <TabsTrigger value="overnight" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 py-2 px-4 shadow-none"><Moon className="w-4 h-4 mr-2" /> Overnight</TabsTrigger>}
@@ -484,7 +532,7 @@ const AdminDashboard = () => {
               <div className="flex-1 flex flex-col sm:flex-row gap-2 w-full">
                 <Input placeholder="Name" value={newParticipantName} onChange={e => setNewParticipantName(e.target.value)} />
                 <Input placeholder="Email" type="email" value={newParticipantEmail} onChange={e => setNewParticipantEmail(e.target.value)} />
-                <Input placeholder="Team (Optional)" value={newParticipantTeam} onChange={e => setNewParticipantTeam(e.target.value)} />
+                <Input placeholder="Team Name" value={newParticipantTeam} onChange={e => setNewParticipantTeam(e.target.value)} />
                 <Button onClick={handleAddParticipant} className="gradient-primary text-primary-foreground whitespace-nowrap"><Plus className="w-4 h-4 mr-1"/> Add</Button>
               </div>
               <div className="flex items-center gap-2">
@@ -606,6 +654,38 @@ const AdminDashboard = () => {
                         </td>
                         <td className="p-3 text-right">
                            <Button variant="ghost" size="sm" onClick={() => removeTeam(t.id)} className="text-destructive group-hover:opacity-100 opacity-0 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="rooms">
+            <div className="mb-4 flex flex-col sm:flex-row gap-4 items-end justify-between">
+              <div className="flex items-center gap-2 flex-1 max-w-sm">
+                <Input placeholder="New Room Name" value={newRoomName} onChange={e => setNewRoomName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddRoom()} />
+                <Button onClick={handleAddRoom} className="gradient-primary text-primary-foreground"><Plus className="w-4 h-4 mr-1" /> Add</Button>
+              </div>
+            </div>
+
+            {rooms.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No rooms created yet. Add a room to allow participants to select it.</p>
+            ) : (
+              <div className="glass-card rounded-xl overflow-x-auto no-scrollbar">
+                <table className="w-full text-sm min-w-full">
+                  <thead><tr className="border-b border-border bg-secondary/30">
+                    <th className="text-left p-3 font-medium">Room Name</th>
+                    <th className="p-3"></th>
+                  </tr></thead>
+                  <tbody>
+                    {rooms.map(r => (
+                      <tr key={r.id} className="border-b border-border/50 group">
+                        <td className="p-3 font-medium">{r.name}</td>
+                        <td className="p-3 text-right">
+                           <Button variant="ghost" size="sm" onClick={() => removeRoom(r.id)} className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></Button>
                         </td>
                       </tr>
                     ))}
