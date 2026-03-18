@@ -560,6 +560,9 @@ const AdminDashboard = () => {
                       <th className="text-left p-3 font-medium">Team</th>
                       <th className="text-left p-3 font-medium">Role</th>
                       <th className="text-left p-3 font-medium">Email</th>
+                      <th className="text-left p-3 font-medium">Room</th>
+                      <th className="text-left p-3 font-medium">Track</th>
+                      <th className="text-left p-3 font-medium">Repo</th>
                       <th className="text-left p-3 font-medium">Confirmed At</th>
                       <th className="p-3"></th>
                     </tr></thead>
@@ -576,6 +579,17 @@ const AdminDashboard = () => {
                             <span className="capitalize text-xs">{p.team_role || 'Member'}</span>
                           </td>
                           <td className="p-3 text-muted-foreground">{p.email}</td>
+                          <td className="p-3">
+                            <span className="font-medium">{rooms.find((r: any) => r.id === p.room_id)?.name || "-"}</span>
+                          </td>
+                          <td className="p-3 text-muted-foreground text-xs">{p.track || "-"}</td>
+                          <td className="p-3">
+                            {p.github_repo ? (
+                              <a href={p.github_repo} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 text-xs">
+                                <LinkIcon className="w-3 h-3" /> Link
+                              </a>
+                            ) : <span className="text-muted-foreground">-</span>}
+                          </td>
                           <td className="p-3 text-muted-foreground">{p.confirmed_at ? format(new Date(p.confirmed_at), "MMM d, h:mm a") : "-"}</td>
                           <td className="p-3">
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
